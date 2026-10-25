@@ -3,6 +3,8 @@ import type { Session } from '@supabase/supabase-js';
 import Auth from './components/Auth';
 import PersonForm from './components/PersonForm';
 import FamilyCanvas from './components/FamilyCanvas';
+import PhotosGallery from './components/PhotosGallery';
+import ShareTree from './components/ShareTree';
 import { friendlyError } from './lib/errors';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
 import type { FamilyTree, Person, Relationship, RelationshipType } from './types';
@@ -22,6 +24,7 @@ export default function App() {
   const [showNewTree, setShowNewTree] = useState(false);
   const [dark, setDark] = useState(() => localStorage.getItem('family-theme') === 'dark');
   const [busy, setBusy] = useState(false);
+  const [activeTab, setActiveTab] = useState<'tree' | 'photos' | 'share'>('tree');
 
   const notify = useCallback((message: string, kind: 'success' | 'error' = 'success') => {
     setToast({ message, kind });
@@ -138,14 +141,17 @@ export default function App() {
       </aside>
       <section className="main-panel">
         {!treeId ? <div className="welcome-empty"><div className="empty-icon">✳</div><h2>Начните с семейного древа</h2><p>Создайте древо, чтобы добавить родственников и соединить поколения.</p><button className="primary" onClick={() => setShowNewTree(true)}>＋ Создать древо</button></div> : <>
-          <div className="page-heading"><div><p className="eyebrow">ВАША ИСТОРИЯ · {persons.length} ПЕРСОН</p><h1>{trees.find(t => t.id === treeId)?.name ?? 'Семейное древо'}</h1><p className="muted">Соедините поколения и сохраните истории близких.</p></div><button className="primary add-person" onClick={() => setEditing(null)}>＋ Добавить персону</button></div>
+          <div className="page-heading"><div><p className="eyebrow">ВАША ИСТОРИЯ · {persons.length} ПЕРСОН</p><h1>{trees.find(t => t.id === treeId)?.name ?? 'Семейное древо'}</h1><p className="muted">Соедините поколения и сохраните истории близких.</p></div>{activeTab === 'tree' && <button className="primary add-person" onClick={() => setEditing(null)}>＋ Добавить персону</button>}</div>
+          <nav className="feature-tabs" aria-label="Разделы дерева"><button className={activeTab==='tree'?'active':''} onClick={()=>setActiveTab('tree')}>Семейное древо</button><button className={activeTab==='photos'?'active':''} onClick={()=>setActiveTab('photos')}>Фотографии</button><button className={activeTab==='share'?'active':''} onClick={()=>setActiveTab('share')}>Поделиться деревом</button></nav>
+          {activeTab === 'photos' ? <PhotosGallery treeId={treeId} userId={session.user.id} persons={persons} notify={notify} /> : activeTab === 'share' ? <ShareTree treeId={treeId} treeName={trees.find(t => t.id === treeId)?.name ?? 'Семейное древо'} persons={persons} notify={notify} /> : <>
           <div className="canvas-card"><div className="canvas-heading"><div><h3>Карта семьи</h3><p className="muted small">Перетаскивайте холст, меняйте масштаб. Дважды щёлкните по карточке для редактирования.</p></div><span className="status-pill"><span /> Сохранение в облаке</span></div>
             <FamilyCanvas persons={persons} relationships={relationships} onEdit={p => setEditing(p)} onConnect={connect} />
           </div>
           <div className="people-section"><div className="section-heading"><div><h2>Люди в древе</h2><p className="muted small">Нажмите на карточку, чтобы открыть её данные.</p></div><span className="count-pill">{persons.length}</span></div>
             {persons.length === 0 ? <div className="empty-people"><div className="empty-icon">＋</div><h3>Создайте первую персону</h3><p>Начните с себя, родителей или любого родственника.</p><button className="primary" onClick={() => setEditing(null)}>Добавить персону</button></div> :
-              <div className="people-grid">{persons.map(p => <article className="person-card" key={p.id} onClick={() => setEditing(p)}><div className="person-card-top"><div className="person-initial">{p.first_name.slice(0,1).toUpperCase()}</div><button className="dots" title="Удалить персону" onClick={e => { e.stopPropagation(); deletePerson(p); }}>•••</button></div><h3>{p.first_name} {p.last_name}</h3><p className="muted small">{p.birth_date || 'Дата рождения не указана'}{p.death_date ? ` — ${p.death_date}` : ''}</p>{p.birth_place && <p className="muted small">⌖ {p.birth_place}</p>}<span className="edit-hint">Открыть карточку ↗</span></article>)}</div>}
+              <div className="people-grid">{persons.map(p => <article className="person-card" key={p.id} onClick={() => setEditing(p)}><div className="person-card-top"><div className="person-initial">{p.first_name.slice(0,1).toUpperCase()}</div><button className="delete-person-icon" title="Удалить персону" aria-label={`Удалить ${p.first_name}`} onClick={e => { e.stopPropagation(); deletePerson(p); }}>🗑</button></div><h3>{p.first_name} {p.patronymic ? `${p.patronymic} ` : ''}{p.last_name}</h3><p className="muted small">{p.birth_date || 'Дата рождения не указана'}{p.death_date ? ` — ${p.death_date}` : ''}</p>{p.birth_place && <p className="muted small">⌖ {p.birth_place}</p>}<span className="edit-hint">Открыть карточку ↗</span></article>)}</div>}
           </div>
+          </>}
         </>}
       </section>
     </main>

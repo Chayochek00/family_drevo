@@ -1,0 +1,46 @@
+-- Run once in Supabase SQL Editor after deploying this app update.
+-- Enables the read-only shared-tree viewer to fetch relationships and photo metadata.
+-- WARNING: this makes the family-photos bucket public so shared viewers can load images.
+-- Anyone who obtains an image's public URL can view that image, even without the share key.
+
+update storage.buckets set public = true where id = 'family-photos';
+
+create or replace function public.get_shared_tree(p_share_name text, p_access_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare result jsonb;
+begin
+  select jsonb_build_object(
+    'name', t.share_name,
+    'persons', coalesce((
+      select jsonb_agg(to_jsonb(p) - 'user_id' order by p.created_at)
+      from public.persons p where p.tree_id = t.id
+    ), '[]'::jsonb),
+    'relationships', coalesce((
+      select jsonb_agg(to_jsonb(r) order by r.id)
+      from public.relationships r where r.tree_id = t.id
+    ), '[]'::jsonb),
+    'photos', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id', ph.id,
+        'person_id', ph.person_id,
+        'photo_path', ph.photo_path,
+        'caption', ph.caption,
+        'photo_date', ph.photo_date,
+        'created_at', ph.created_at
+      ) order by ph.photo_date desc nulls last, ph.created_at desc)
+      from public.tree_photos ph where ph.tree_id = t.id
+    ), '[]'::jsonb)
+  ) into result
+  from public.family_trees t
+  where lower(t.share_name) = lower(trim(p_share_name))
+    and t.share_key_hash = encode(digest(p_access_key, 'sha256'), 'hex');
+
+  return result;
+end;
+$$;
+revoke all on function public.get_shared_tree(text,text) from public;
+grant execute on function public.get_shared_tree(text,text) to anon, authenticated;

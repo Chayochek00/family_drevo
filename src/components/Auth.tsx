@@ -18,9 +18,10 @@ export default function Auth({ notify }: Props) {
     setBusy(true);
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({ email: email.trim(), password });
+        const redirectTo = `${window.location.origin}${import.meta.env.BASE_URL}`;
+        const { error } = await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: redirectTo } });
         if (error) throw error;
-        notify('Регистрация отправлена. Если подтверждение включено, проверьте почту.', 'success');
+        notify('Мы отправили письмо вам на почту', 'success');
       } else if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;

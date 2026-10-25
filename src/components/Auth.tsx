@@ -21,7 +21,7 @@ export default function Auth({ notify }: Props) {
         const redirectTo = `${window.location.origin}${import.meta.env.BASE_URL}`;
         const { error } = await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: redirectTo } });
         if (error) throw error;
-        notify('Мы отправили письмо вам на почту', 'success');
+        notify('Мы отправили письмо с подтверждением вам на почту', 'success');
       } else if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
@@ -29,7 +29,7 @@ export default function Auth({ notify }: Props) {
         const redirectTo = `${window.location.origin}${import.meta.env.BASE_URL}`;
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
         if (error) throw error;
-        notify('Если адрес зарегистрирован, письмо для восстановления отправлено.', 'success');
+        notify('Если аккаунт зарегистрирован, то письмо для восстановления отправлено вам на почту.', 'success');
       }
     } catch (err) {
       notify(friendlyError(err), 'error');
@@ -53,6 +53,10 @@ export default function Auth({ notify }: Props) {
         {mode !== 'reset' && <label>Пароль<input type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} minLength={6} required /></label>}
         <button className="primary full" disabled={busy}>{busy ? 'Подождите…' : mode === 'login' ? 'Войти' : mode === 'signup' ? 'Создать аккаунт' : 'Отправить ссылку'}</button>
       </form>
+      {mode === 'signup' && <div className="user-agreement">
+        <strong>*Пользовательское соглашение</strong>
+        <p>Используя этот сайт, вы принимете тот факт, что администрация проекта не несёт ответственности за сохранность, потерю или повреждение размещённых вами данных. Не загружайте сюда пароли и другую важную конфиденциальную информацию.</p>
+      </div>}
       <div className="auth-foot">
         <button className="text-button" onClick={() => setMode(mode === 'reset' ? 'login' : 'reset')}>
           {mode === 'reset' ? 'Вернуться ко входу' : 'Забыли пароль?'}

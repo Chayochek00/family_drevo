@@ -98,13 +98,13 @@ export default function App() {
     } catch (e) { notify(friendlyError(e), 'error'); }
   }
 
-  async function connect(from: string, to: string, type: RelationshipType) {
+  async function connect(from: string, to: string, type: RelationshipType, sourceHandle: string = 'source-bottom', targetHandle: string = 'target-top') {
     if (!supabase || !treeId) return;
     // For parent relations, from_person_id is the parent and to_person_id is the child.
     const exists = relationships.some(r => r.from_person_id === from && r.to_person_id === to && r.type === type);
     if (exists) return notify('Такая связь уже существует.', 'error');
     try {
-      const { error } = await supabase.from('relationships').insert({ tree_id: treeId, from_person_id: from, to_person_id: to, type });
+      const { error } = await supabase.from('relationships').insert({ tree_id: treeId, from_person_id: from, to_person_id: to, type, source_handle: sourceHandle, target_handle: targetHandle });
       if (error) throw error;
       await loadTreeData(); notify('Родственная связь добавлена.');
     } catch (e) { notify(friendlyError(e), 'error'); }

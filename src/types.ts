@@ -9,6 +9,7 @@ export type Person = {
   tree_id: string;
   first_name: string;
   last_name: string | null;
+  patronymic: string | null;
   birth_date: string | null;
   death_date: string | null;
   birth_place: string | null;

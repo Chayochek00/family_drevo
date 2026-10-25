@@ -10,6 +10,7 @@ import { friendlyError } from '../lib/errors';
 const schema = z.object({
   first_name: z.string().trim().min(1, 'Введите имя').max(80, 'Максимум 80 символов'),
   last_name: z.string().max(100).optional(),
+  patronymic: z.string().max(100).optional(),
   birth_date: z.string().optional(),
   death_date: z.string().optional(),
   birth_place: z.string().max(160).optional(),
@@ -36,7 +37,7 @@ export default function PersonForm({ treeId, userId, person, onClose, onSaved, n
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      first_name: person?.first_name ?? '', last_name: person?.last_name ?? '',
+      first_name: person?.first_name ?? '', last_name: person?.last_name ?? '', patronymic: person?.patronymic ?? '',
       birth_date: person?.birth_date ?? '', death_date: person?.death_date ?? '',
       birth_place: person?.birth_place ?? '', biography: person?.biography ?? '',
       gender: person?.gender ?? 'unspecified',
@@ -55,7 +56,7 @@ export default function PersonForm({ treeId, userId, person, onClose, onSaved, n
     try {
       const payload = {
         tree_id: treeId, first_name: values.first_name.trim(),
-        last_name: values.last_name?.trim() || null,
+        last_name: values.last_name?.trim() || null, patronymic: values.patronymic?.trim() || null,
         birth_date: values.birth_date || null, death_date: values.death_date || null,
         birth_place: values.birth_place?.trim() || null, biography: values.biography?.trim() || null,
         gender: values.gender,
@@ -86,6 +87,7 @@ export default function PersonForm({ treeId, userId, person, onClose, onSaved, n
         <div className="form-grid">
           <label>Имя *<input {...register('first_name')} placeholder="Александр" /></label>
           <label>Фамилия<input {...register('last_name')} placeholder="Иванов" /></label>
+          <label>Отчество<input {...register('patronymic')} placeholder="Александрович" /></label>
           {errors.first_name && <p className="field-error">{errors.first_name.message}</p>}
           <label>Дата рождения<input type="date" {...register('birth_date')} /></label>
           <label>Дата смерти<input type="date" {...register('death_date')} /></label>

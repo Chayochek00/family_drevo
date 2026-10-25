@@ -21,3 +21,13 @@
 
 /* Full-screen family canvas and selectable connection anchors */
 .canvas-fullscreen{position:fixed!important;inset:0!important;z-index:100!important;width:100vw!important;height:100dvh!important;background:var(--panel);border-radius:0!important;box-shadow:none!important}.canvas-fullscreen .canvas{flex:1;min-height:0}.canvas-fullscreen .relationship-toolbar{max-height:30vh;overflow:auto;background:var(--panel)}.canvas-fullscreen-toggle{position:absolute;right:12px;top:12px;z-index:8;font-size:11px;padding:8px 11px;box-shadow:0 3px 12px #0002}.canvas-fullscreen .canvas-fullscreen-toggle{position:fixed;top:12px;right:12px}.side-select{display:flex;align-items:center;gap:5px;font-size:10px;white-space:nowrap}.side-select select{max-width:105px!important;min-width:80px}.person-node .react-flow__handle{width:11px;height:11px;border:2px solid var(--panel);background:var(--accent);box-shadow:0 0 0 1px var(--accent)}.person-node .react-flow__handle:hover{transform:scale(1.35)}
+
+/* Softer family nodes, hover-only relation labels, spouse midpoint connectors */
+.person-node{border-radius:28px;padding:14px 12px 12px;box-shadow:0 8px 26px #1b274212;transition:border-color .16s,box-shadow .16s,transform .16s}
+.person-node:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));box-shadow:0 12px 30px #1b27421f;transform:translateY(-1px)}
+.person-node .react-flow__handle-left,.person-node .react-flow__handle-right{top:50%;width:12px;height:12px;background:#c084fc;border-color:var(--panel);box-shadow:0 0 0 1px #c084fc}
+.react-flow__edge-text{opacity:0;transition:opacity .15s ease;pointer-events:none}
+.react-flow__edge:hover .react-flow__edge-text,.react-flow__edge:focus .react-flow__edge-text{opacity:1}
+.canvas-help{width:100%;padding:0 14px 10px;line-height:1.45}
+.connection-modal{width:min(100%,460px)}
+@media(max-width:650px){.canvas-help{font-size:10px}.person-node{border-radius:23px}}

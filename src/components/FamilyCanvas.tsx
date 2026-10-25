@@ -11,8 +11,6 @@ function PersonNode({ data }: NodeProps<Node<PersonNodeData>>) {
   return <div className="person-node" onContextMenu={e => { if (readOnly) return; e.preventDefault(); e.stopPropagation(); onNodeContextMenu(person); }} onDoubleClick={() => { if (!readOnly) onEdit(person); }} title={readOnly ? 'Только просмотр' : 'Двойной щелчок — редактировать; ПКМ — управление связями'}>
     <Handle id="target-top" type="target" position={Position.Top} />
     <Handle id="source-top" type="source" position={Position.Top} />
-    <Handle id="target-spouse" type="target" position={Position.Left} />
-    <Handle id="source-spouse" type="source" position={Position.Right} />
     {photoUrl ? <img className="node-avatar" src={photoUrl} alt="" /> : <div className="node-avatar placeholder">{person.first_name.slice(0,1).toUpperCase()}</div>}
     <div className="node-name">{fullName}</div>
     <div className="node-dates">{person.birth_date?.slice(0,4) ?? '—'}{person.death_date ? ` – ${person.death_date.slice(0,4)}` : ''}</div>
@@ -63,7 +61,7 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onDelete,
   useEffect(() => {
     const relationshipEdges: Edge[] = relationships.map(r => ({
       id: r.id, source: r.from_person_id, target: r.to_person_id, sourceHandle: r.source_handle ?? 'source-bottom', targetHandle: r.target_handle ?? 'target-top',
-      label: r.type === 'parent' ? 'родитель → ребёнок' : r.type === 'spouse' ? 'супруги' : r.type === 'uncle_aunt' ? 'дядя/тётя' : r.type === 'niece_nephew' ? 'племянник/племянница' : 'брат/сестра',
+      label: r.type === 'parent' ? 'родитель → ребёнок' : r.type === 'spouse' ? 'супруги · ●' : r.type === 'uncle_aunt' ? 'дядя/тётя' : r.type === 'niece_nephew' ? 'племянник/племянница' : 'брат/сестра',
       labelShowBg: true, labelBgStyle: { fill: 'var(--panel)', fillOpacity: 0.94 }, labelBgPadding: [5, 3], labelBgBorderRadius: 4,
       type: 'smoothstep', animated: false,
       style: { stroke: r.type === 'spouse' ? '#c084fc' : '#93a4bd', strokeWidth: 2 },
@@ -86,7 +84,7 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onDelete,
       const laidOut = layoutNodes(baseNodes, edges);
       return laidOut.map(n => existing.has(n.id) ? { ...n, position: existing.get(n.id)!.position } : n);
     });
-  }, [persons, photoUrls, onEdit, readOnly, edges, setNodes]);
+  }, [persons, relationships, photoUrls, onEdit, readOnly, edges, setNodes]);
 
   const handleConnect = useCallback((connection: Connection) => {
     if (readOnly || !connection.source || !connection.target || connection.source === connection.target) return;
@@ -95,8 +93,7 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onDelete,
 
   const confirmConnection = () => {
     if (!pendingConnection?.source || !pendingConnection.target) return;
-    const spouseHandles = pendingConnection.sourceHandle === 'source-spouse' || pendingConnection.targetHandle === 'target-spouse';
-    onConnect(pendingConnection.source, pendingConnection.target, type, pendingConnection.sourceHandle ?? (spouseHandles ? 'source-spouse' : 'source-bottom'), pendingConnection.targetHandle ?? (spouseHandles ? 'target-spouse' : 'target-top'));
+    onConnect(pendingConnection.source, pendingConnection.target, type, pendingConnection.sourceHandle ?? 'source-bottom', pendingConnection.targetHandle ?? 'target-top');
     setPendingConnection(null);
   };
 
@@ -104,7 +101,7 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onDelete,
     {!readOnly && <div className="relationship-toolbar">
       <span className="muted small">Связи как в редакторе нодов:</span>
       <select aria-label="Тип связи для перетаскивания" value={type} onChange={e => setType(e.target.value as typeof type)}><option value="parent">Родитель → ребёнок</option><option value="sibling">Брат / сестра</option><option value="spouse">Супруги</option><option value="uncle_aunt">Дядя / тётя → племянник/племянница</option><option value="niece_nephew">Племянник/племянница → дядя/тётя</option></select>
-      <span className="muted small">Потяните соединитель одной персоны к другой — после соединения выберите родственную связь. Точки по бокам — для супругов.</span>
+      <span className="muted small">Потяните соединитель одной персоны к другой — после соединения выберите родственную связь. На линии супругов в центре отмечена общая точка для семейной связи.</span>
       <span className="muted small">Или добавьте связь вручную:</span>
       <select aria-label="Первая персона" value={source} onChange={e => setSource(e.target.value)}><option value="">От кого…</option>{persons.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}</select>
       <select aria-label="Вторая персона" value={target} onChange={e => setTarget(e.target.value)}><option value="">С кем…</option>{persons.filter(p => p.id !== source).map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}</select>

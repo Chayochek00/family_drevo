@@ -18,7 +18,7 @@ export type Person = {
   created_at: string;
 };
 
-export type RelationshipType = 'parent' | 'sibling' | 'spouse';
+export type RelationshipType = 'parent' | 'sibling' | 'spouse' | 'uncle_aunt' | 'niece_nephew';
 
 export type Relationship = {
   id: string;

@@ -73,6 +73,11 @@ export default function PersonForm({ treeId, userId, person, onClose, onSaved, n
         const path = await uploadPersonPhoto(file, userId, personId);
         const { error } = await supabase.from('persons').update({ photo_path: path }).eq('id', personId);
         if (error) throw error;
+        const caption = `${values.first_name.trim()} ${values.patronymic?.trim() ? values.patronymic.trim() + ' ' : ''}${values.last_name?.trim() ?? ''}`.trim();
+        const { error: galleryError } = await supabase.from('tree_photos').insert({
+          tree_id: treeId, person_id: personId, photo_path: path, caption, photo_date: null,
+        });
+        if (galleryError) throw galleryError;
       }
       notify('Персона сохранена.', 'success');
       await onSaved(); onClose();

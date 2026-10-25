@@ -18,7 +18,7 @@ function PersonNode({ data }: NodeProps<Node<PersonNodeData>>) {
   </div>;
 }
 const nodeTypes = { person: PersonNode };
-type Props = { persons: Person[]; relationships: Relationship[]; onEdit: (p: Person) => void; onConnect: (from: string, to: string, type: 'parent' | 'sibling' | 'spouse') => void };
+type Props = { persons: Person[]; relationships: Relationship[]; onEdit: (p: Person) => void; onConnect: (from: string, to: string, type: 'parent' | 'sibling' | 'spouse' | 'uncle_aunt' | 'niece_nephew') => void };
 
 function layoutNodes(nodes: Node<PersonNodeData>[], edges: Edge[]) {
   const graph = new dagre.graphlib.Graph();
@@ -37,7 +37,7 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onConnect
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [source, setSource] = useState('');
   const [target, setTarget] = useState('');
-  const [type, setType] = useState<'parent' | 'sibling' | 'spouse'>('parent');
+  const [type, setType] = useState<'parent' | 'sibling' | 'spouse' | 'uncle_aunt' | 'niece_nephew'>('parent');
 
   useEffect(() => {
     let cancelled = false;
@@ -50,7 +50,7 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onConnect
   const { nodes, edges } = useMemo(() => {
     const baseEdges: Edge[] = relationships.map(r => ({
       id: r.id, source: r.from_person_id, target: r.to_person_id,
-      label: r.type === 'parent' ? 'родитель' : r.type === 'spouse' ? 'супруги' : 'брат/сестра',
+      label: r.type === 'parent' ? 'родитель' : r.type === 'spouse' ? 'супруги' : r.type === 'uncle_aunt' ? 'дядя/тётя' : r.type === 'niece_nephew' ? 'племянник/племянница' : 'брат/сестра',
       type: 'smoothstep', animated: false,
       style: { stroke: r.type === 'spouse' ? '#c084fc' : '#93a4bd', strokeWidth: 2 },
       labelStyle: { fill: 'var(--muted)', fontSize: 10 },
@@ -65,7 +65,7 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onConnect
     <div className="relationship-toolbar">
       <span className="muted small">Добавить связь:</span>
       <select aria-label="Первая персона" value={source} onChange={e => setSource(e.target.value)}><option value="">От кого…</option>{persons.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}</select>
-      <select aria-label="Тип связи" value={type} onChange={e => setType(e.target.value as typeof type)}><option value="parent">Родитель → ребёнок</option><option value="sibling">Брат / сестра</option><option value="spouse">Супруги</option></select>
+      <select aria-label="Тип связи" value={type} onChange={e => setType(e.target.value as typeof type)}><option value="parent">Родитель → ребёнок</option><option value="sibling">Брат / сестра</option><option value="spouse">Супруги</option><option value="uncle_aunt">Дядя / тётя → племянник/племянница</option><option value="niece_nephew">Племянник/племянница → дядя/тётя</option></select>
       <select aria-label="Вторая персона" value={target} onChange={e => setTarget(e.target.value)}><option value="">С кем…</option>{persons.filter(p => p.id !== source).map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}</select>
       <button className="secondary small-button" disabled={!source || !target || source === target} onClick={() => { onConnect(source, target, type); setSource(''); setTarget(''); }}>Связать</button>
     </div>

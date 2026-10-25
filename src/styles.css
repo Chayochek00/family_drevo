@@ -31,3 +31,15 @@
 .canvas-help{width:100%;padding:0 14px 10px;line-height:1.45}
 .connection-modal{width:min(100%,460px)}
 @media(max-width:650px){.canvas-help{font-size:10px}.person-node{border-radius:23px}}
+
+/* Compact relationship list and node right-click relationship menu */
+.relationship-list{max-height:none;padding:7px 14px;gap:7px}
+.relationship-list.collapsed{padding-top:7px;padding-bottom:7px}
+.relationship-list-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.relationship-list-heading .small-button{padding:6px 10px}
+.relationship-list.expanded{max-height:190px;overflow:auto}
+.node-relationship-menu{position:absolute;z-index:12;top:52px;left:12px;width:min(440px,calc(100% - 24px));max-height:calc(100% - 70px);overflow:auto;padding:13px;background:var(--panel);border:1px solid var(--line);border-radius:13px;box-shadow:0 12px 36px #0002}
+.node-relationship-menu-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;font-size:12px}
+.node-relationship-menu-heading .icon-button{width:28px;height:28px;font-size:17px}
+.node-relationship-menu-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:11px}
+.node-relationship-menu-row span{flex:1;min-width:0}

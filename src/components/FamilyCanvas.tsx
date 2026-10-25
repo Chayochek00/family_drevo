@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Background, Controls, MiniMap, ReactFlow, Handle, Position, useNodesState, useEdgesState, type Connection, type Edge, type Node, type NodeProps } from '@xyflow/react';
+import { Background, Controls, MiniMap, ReactFlow, Handle, Position, useNodesState, useEdgesState, applyNodeChanges, type NodeChange, type Connection, type Edge, type Node, type NodeProps } from '@xyflow/react';
 import dagre from 'dagre';
 import type { Person, Relationship } from '../types';
 import { signedPhotoUrl } from '../lib/image';
@@ -19,7 +19,35 @@ function PersonNode({ data }: NodeProps<Node<PersonNodeData>>) {
     <Handle id="source-bottom" type="source" position={Position.Bottom} />
   </div>;
 }
-const nodeTypes = { person: PersonNode };
+type SpouseJunctionData = { relationshipId: string };
+function SpouseJunctionNode({}: NodeProps<Node<SpouseJunctionData>>) {
+  return <div className="spouse-junction" title="Общая точка супругов — соедините её с ребёнком">
+    <Handle id="junction-source" type="source" position={Position.Bottom} />
+    <Handle id="junction-target" type="target" position={Position.Top} />
+  </div>;
+}
+const nodeTypes = { person: PersonNode, spouseJunction: SpouseJunctionNode };
+const JUNCTION_PREFIX = 'spouse-junction:';
+function positionSpouseJunctions(allNodes: Node[], relationships: Relationship[]): Node[] {
+  const byId = new Map(allNodes.map(n => [n.id, n]));
+  return allNodes.map(node => {
+    if (!node.id.startsWith(JUNCTION_PREFIX)) return node;
+    const relationship = relationships.find(r => `${JUNCTION_PREFIX}${r.id}` === node.id && r.type === 'spouse');
+    if (!relationship) return node;
+    const a = byId.get(relationship.from_person_id);
+    const b = byId.get(relationship.to_person_id);
+    if (!a || !b) return node;
+    const widthA = a.measured?.width ?? 190;
+    const widthB = b.measured?.width ?? 190;
+    const heightA = a.measured?.height ?? 170;
+    const heightB = b.measured?.height ?? 170;
+    const centerAX = a.position.x + widthA / 2;
+    const centerBX = b.position.x + widthB / 2;
+    const centerAY = a.position.y + heightA / 2;
+    const centerBY = b.position.y + heightB / 2;
+    return { ...node, position: { x: (centerAX + centerBX) / 2 - 8, y: (centerAY + centerBY) / 2 - 8 } };
+  });
+}
 type RelationType = 'parent' | 'sibling' | 'spouse' | 'uncle_aunt' | 'niece_nephew';
 type Props = { persons: Person[]; relationships: Relationship[]; onEdit: (p: Person) => void; onDelete: (p: Person) => void; onConnect: (from: string, to: string, type: RelationType, sourceHandle?: string, targetHandle?: string) => void; onUpdateRelationship: (id: string, type: RelationType) => void; onDeleteRelationship: (id: string) => void; readOnly?: boolean };
 
@@ -81,15 +109,37 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onDelete,
           position: old?.position ?? { x: 0, y: 0 },
         };
       });
-      const laidOut = layoutNodes(baseNodes, edges);
-      return laidOut.map(n => existing.has(n.id) ? { ...n, position: existing.get(n.id)!.position } : n);
+      const laidOut = layoutNodes(baseNodes, edges).map(n => existing.has(n.id) ? { ...n, position: existing.get(n.id)!.position } : n);
+      const spouseRelationships = relationships.filter(r => r.type === 'spouse');
+      const junctionNodes: Node<SpouseJunctionData>[] = spouseRelationships.map(r => {
+        const id = `${JUNCTION_PREFIX}${r.id}`;
+        const old = existing.get(id);
+        return { id, type: 'spouseJunction', data: { relationshipId: r.id }, position: old?.position ?? { x: 0, y: 0 }, draggable: false, selectable: false, connectable: !readOnly, zIndex: 5 };
+      });
+      return positionSpouseJunctions([...laidOut, ...junctionNodes], relationships);
     });
   }, [persons, relationships, photoUrls, onEdit, readOnly, edges, setNodes]);
 
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    setNodes(current => positionSpouseJunctions(applyNodeChanges(changes, current), relationships));
+  }, [relationships, setNodes]);
+
   const handleConnect = useCallback((connection: Connection) => {
     if (readOnly || !connection.source || !connection.target || connection.source === connection.target) return;
+    const sourceIsJunction = connection.source.startsWith(JUNCTION_PREFIX);
+    const targetIsJunction = connection.target.startsWith(JUNCTION_PREFIX);
+    if (sourceIsJunction || targetIsJunction) {
+      const junctionId = sourceIsJunction ? connection.source : connection.target;
+      const childId = sourceIsJunction ? connection.target : connection.source;
+      const spouseRelationship = relationships.find(r => `${JUNCTION_PREFIX}${r.id}` === junctionId && r.type === 'spouse');
+      if (!spouseRelationship || childId.startsWith(JUNCTION_PREFIX)) return;
+      // A child connected to the spouses' shared point gets both spouses as parents.
+      onConnect(spouseRelationship.from_person_id, childId, 'parent', 'source-bottom', 'target-top');
+      onConnect(spouseRelationship.to_person_id, childId, 'parent', 'source-bottom', 'target-top');
+      return;
+    }
     setPendingConnection(connection);
-  }, [readOnly]);
+  }, [readOnly, relationships, onConnect]);
 
   const confirmConnection = () => {
     if (!pendingConnection?.source || !pendingConnection.target) return;
@@ -101,7 +151,7 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onDelete,
     {!readOnly && <div className="relationship-toolbar">
       <span className="muted small">Связи как в редакторе нодов:</span>
       <select aria-label="Тип связи для перетаскивания" value={type} onChange={e => setType(e.target.value as typeof type)}><option value="parent">Родитель → ребёнок</option><option value="sibling">Брат / сестра</option><option value="spouse">Супруги</option><option value="uncle_aunt">Дядя / тётя → племянник/племянница</option><option value="niece_nephew">Племянник/племянница → дядя/тётя</option></select>
-      <span className="muted small">Потяните соединитель одной персоны к другой — после соединения выберите родственную связь. На линии супругов в центре отмечена общая точка для семейной связи.</span>
+      <span className="muted small">Потяните соединитель одной персоны к другой — после соединения выберите родственную связь. От центральной точки между супругами можно провести связь к ребёнку — он будет связан с обоими супругами как с родителями.</span>
       <span className="muted small">Или добавьте связь вручную:</span>
       <select aria-label="Первая персона" value={source} onChange={e => setSource(e.target.value)}><option value="">От кого…</option>{persons.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}</select>
       <select aria-label="Вторая персона" value={target} onChange={e => setTarget(e.target.value)}><option value="">С кем…</option>{persons.filter(p => p.id !== source).map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}</select>
@@ -112,7 +162,7 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onDelete,
     <div className="canvas" onClick={() => setContextPerson(null)}><button className="canvas-fullscreen-toggle secondary" onClick={() => setFullscreen(v => !v)}>{fullscreen ? '⤢ Выйти из полного экрана' : '⛶ На весь экран'}</button>
       {contextPerson && !readOnly && <div className="node-relationship-menu" onClick={e => e.stopPropagation()}><div className="node-relationship-menu-heading"><strong>Связи: {contextPerson.first_name} {contextPerson.last_name ?? ''}</strong><button className="icon-button" onClick={() => setContextPerson(null)} aria-label="Закрыть">×</button></div>{relationships.filter(r => r.from_person_id === contextPerson.id || r.to_person_id === contextPerson.id).length === 0 ? <p className="muted small">У этой персоны пока нет связей.</p> : relationships.filter(r => r.from_person_id === contextPerson.id || r.to_person_id === contextPerson.id).map(r => <div className="node-relationship-menu-row" key={r.id}><span>{persons.find(p => p.id === (r.from_person_id === contextPerson.id ? r.to_person_id : r.from_person_id))?.first_name ?? 'Персона'} · {r.type === 'parent' ? 'родитель → ребёнок' : r.type === 'sibling' ? 'брат / сестра' : r.type === 'spouse' ? 'супруги' : r.type === 'uncle_aunt' ? 'дядя / тётя' : 'племянник / племянница'}</span><button className="danger-small" onClick={() => { onDeleteRelationship(r.id); setContextPerson(null); }}>Удалить связь</button></div>)}</div>}
       {persons.length === 0 ? <div className="empty-canvas"><div className="empty-icon">✳</div><h3>Здесь начнётся ваша история</h3><p>Добавьте первую персону, затем соедините родственников.</p></div> :
-        <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={handleConnect} nodeTypes={nodeTypes} fitView minZoom={0.15} maxZoom={2.2} nodesDraggable={!readOnly} nodesConnectable={!readOnly} edgesReconnectable={!readOnly} deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']} connectionLineStyle={{ stroke: '#7c8cff', strokeWidth: 2 }} proOptions={{ hideAttribution: true }}>
+        <ReactFlow nodes={nodes} edges={edges} onNodesChange={handleNodesChange} onEdgesChange={onEdgesChange} onConnect={handleConnect} nodeTypes={nodeTypes} fitView minZoom={0.15} maxZoom={2.2} nodesDraggable={!readOnly} nodesConnectable={!readOnly} edgesReconnectable={!readOnly} deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']} connectionLineStyle={{ stroke: '#7c8cff', strokeWidth: 2 }} proOptions={{ hideAttribution: true }}>
           <Background color="var(--grid)" gap={22} /><Controls /><MiniMap pannable zoomable nodeColor="var(--accent)" />
         </ReactFlow>}
     </div>

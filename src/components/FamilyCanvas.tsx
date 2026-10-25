@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Background, Controls, MiniMap, ReactFlow, Handle, Position, type Edge, type Node, type NodeProps } from '@xyflow/react';
+import { useEffect, useState, useCallback } from 'react';
+import { Background, Controls, MiniMap, ReactFlow, Handle, Position, useNodesState, useEdgesState, type Connection, type Edge, type Node, type NodeProps } from '@xyflow/react';
 import dagre from 'dagre';
 import type { Person, Relationship } from '../types';
 import { signedPhotoUrl } from '../lib/image';
@@ -38,6 +38,8 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onConnect
   const [source, setSource] = useState('');
   const [target, setTarget] = useState('');
   const [type, setType] = useState<'parent' | 'sibling' | 'spouse' | 'uncle_aunt' | 'niece_nephew'>('parent');
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<PersonNodeData>>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,31 +49,52 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onConnect
     return () => { cancelled = true; };
   }, [persons]);
 
-  const { nodes, edges } = useMemo(() => {
-    const baseEdges: Edge[] = relationships.map(r => ({
+  useEffect(() => {
+    const relationshipEdges: Edge[] = relationships.map(r => ({
       id: r.id, source: r.from_person_id, target: r.to_person_id,
-      label: r.type === 'parent' ? 'родитель' : r.type === 'spouse' ? 'супруги' : r.type === 'uncle_aunt' ? 'дядя/тётя' : r.type === 'niece_nephew' ? 'племянник/племянница' : 'брат/сестра',
+      label: r.type === 'parent' ? 'родитель → ребёнок' : r.type === 'spouse' ? 'супруги' : r.type === 'uncle_aunt' ? 'дядя/тётя' : r.type === 'niece_nephew' ? 'племянник/племянница' : 'брат/сестра',
       type: 'smoothstep', animated: false,
       style: { stroke: r.type === 'spouse' ? '#c084fc' : '#93a4bd', strokeWidth: 2 },
       labelStyle: { fill: 'var(--muted)', fontSize: 10 },
     }));
-    const baseNodes: Node<PersonNodeData>[] = persons.map(p => ({
-      id: p.id, type: 'person', data: { person: p, photoUrl: photoUrls[p.id] ?? null, onEdit, readOnly }, position: { x: 0, y: 0 },
-    }));
-    return { nodes: layoutNodes(baseNodes, baseEdges), edges: baseEdges };
-  }, [persons, relationships, photoUrls, onEdit, readOnly]);
+    setEdges(relationshipEdges);
+  }, [relationships, setEdges]);
+
+  useEffect(() => {
+    setNodes(current => {
+      const existing = new Map(current.map(n => [n.id, n]));
+      const baseNodes: Node<PersonNodeData>[] = persons.map(p => {
+        const old = existing.get(p.id);
+        return {
+          id: p.id, type: 'person',
+          data: { person: p, photoUrl: photoUrls[p.id] ?? null, onEdit, readOnly },
+          position: old?.position ?? { x: 0, y: 0 },
+        };
+      });
+      const laidOut = layoutNodes(baseNodes, edges);
+      return laidOut.map(n => existing.has(n.id) ? { ...n, position: existing.get(n.id)!.position } : n);
+    });
+  }, [persons, photoUrls, onEdit, readOnly, edges, setNodes]);
+
+  const handleConnect = useCallback((connection: Connection) => {
+    if (readOnly || !connection.source || !connection.target || connection.source === connection.target) return;
+    // A direct drag between node handles uses the currently selected relationship type.
+    onConnect(connection.source, connection.target, type);
+  }, [readOnly, onConnect, type]);
 
   return <div className="canvas-wrap">
     {!readOnly && <div className="relationship-toolbar">
-      <span className="muted small">Добавить связь:</span>
+      <span className="muted small">Связи как в редакторе нодов:</span>
+      <select aria-label="Тип связи для перетаскивания" value={type} onChange={e => setType(e.target.value as typeof type)}><option value="parent">Родитель → ребёнок</option><option value="sibling">Брат / сестра</option><option value="spouse">Супруги</option><option value="uncle_aunt">Дядя / тётя → племянник/племянница</option><option value="niece_nephew">Племянник/племянница → дядя/тётя</option></select>
+      <span className="muted small">Перетащите линию от нижнего кружка одной персоны к верхнему кружку другой.</span>
+      <span className="muted small">Или добавьте связь вручную:</span>
       <select aria-label="Первая персона" value={source} onChange={e => setSource(e.target.value)}><option value="">От кого…</option>{persons.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}</select>
-      <select aria-label="Тип связи" value={type} onChange={e => setType(e.target.value as typeof type)}><option value="parent">Родитель → ребёнок</option><option value="sibling">Брат / сестра</option><option value="spouse">Супруги</option><option value="uncle_aunt">Дядя / тётя → племянник/племянница</option><option value="niece_nephew">Племянник/племянница → дядя/тётя</option></select>
       <select aria-label="Вторая персона" value={target} onChange={e => setTarget(e.target.value)}><option value="">С кем…</option>{persons.filter(p => p.id !== source).map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}</select>
       <button className="secondary small-button" disabled={!source || !target || source === target} onClick={() => { onConnect(source, target, type); setSource(''); setTarget(''); }}>Связать</button>
     </div>}
     <div className="canvas">
       {persons.length === 0 ? <div className="empty-canvas"><div className="empty-icon">✳</div><h3>Здесь начнётся ваша история</h3><p>Добавьте первую персону, затем соедините родственников.</p></div> :
-        <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} fitView fitViewOptions={{ padding: 0.18 }} minZoom={0.15} maxZoom={2.2} nodesDraggable={!readOnly} nodesConnectable={false} proOptions={{ hideAttribution: true }}>
+        <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={handleConnect} nodeTypes={nodeTypes} fitView minZoom={0.15} maxZoom={2.2} nodesDraggable={!readOnly} nodesConnectable={!readOnly} edgesReconnectable={false} connectionLineStyle={{ stroke: '#7c8cff', strokeWidth: 2 }} proOptions={{ hideAttribution: true }}>
           <Background color="var(--grid)" gap={22} /><Controls /><MiniMap pannable zoomable nodeColor="var(--accent)" />
         </ReactFlow>}
     </div>

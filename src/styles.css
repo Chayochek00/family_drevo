@@ -12,3 +12,5 @@
 
 /* Read-only shared tree full-page viewer */
 .shared-full-page{margin-top:22px;padding:20px;border:1px solid var(--line);border-radius:18px;background:var(--bg);min-width:0}.shared-page-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}.shared-page-header h2{margin:3px 0 6px}.shared-page-header p{margin-top:0}.shared-full-page .canvas-card{margin-bottom:18px}.shared-full-page .person-card{cursor:default}.shared-full-page .person-card:hover{transform:none}.shared-full-page .person-initial img,.shared-full-page img.person-initial{object-fit:cover}.shared-full-page .canvas{min-height:430px}.shared-full-page .feature-tabs{margin-top:4px}@media(max-width:650px){.shared-full-page{padding:12px}.shared-page-header{flex-direction:column}.shared-full-page .canvas{min-height:350px}}
+
+.user-agreement{margin-top:22px;padding:15px 16px;border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line));border-radius:12px;background:var(--soft);font-size:14px;line-height:1.6;color:var(--text)}.user-agreement strong{display:block;font-size:16px;margin-bottom:6px}.user-agreement p{margin:0}

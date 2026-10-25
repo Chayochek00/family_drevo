@@ -110,6 +110,24 @@ export default function App() {
     } catch (e) { notify(friendlyError(e), 'error'); }
   }
 
+  async function updateRelationship(id: string, type: RelationshipType) {
+    if (!supabase) return;
+    try {
+      const { error } = await supabase.from('relationships').update({ type }).eq('id', id);
+      if (error) throw error;
+      await loadTreeData(); notify('Тип родственной связи изменён.');
+    } catch (e) { notify(friendlyError(e), 'error'); }
+  }
+
+  async function deleteRelationship(id: string) {
+    if (!supabase || !window.confirm('Удалить эту родственную связь?')) return;
+    try {
+      const { error } = await supabase.from('relationships').delete().eq('id', id);
+      if (error) throw error;
+      await loadTreeData(); notify('Родственная связь удалена.');
+    } catch (e) { notify(friendlyError(e), 'error'); }
+  }
+
   async function deletePerson(person: Person) {
     if (!supabase || !window.confirm(`Удалить персону «${person.first_name} ${person.last_name ?? ''}»?`)) return;
     try {
@@ -145,7 +163,7 @@ export default function App() {
           <nav className="feature-tabs" aria-label="Разделы дерева"><button className={activeTab==='tree'?'active':''} onClick={()=>setActiveTab('tree')}>Семейное древо</button><button className={activeTab==='photos'?'active':''} onClick={()=>setActiveTab('photos')}>Фотографии</button><button className={activeTab==='share'?'active':''} onClick={()=>setActiveTab('share')}>Поделиться деревом</button></nav>
           {activeTab === 'photos' ? <PhotosGallery treeId={treeId} userId={session.user.id} persons={persons} notify={notify} /> : activeTab === 'share' ? <ShareTree treeId={treeId} treeName={trees.find(t => t.id === treeId)?.name ?? 'Семейное древо'} persons={persons} notify={notify} /> : <>
           <div className="canvas-card"><div className="canvas-heading"><div><h3>Карта семьи</h3><p className="muted small">Перетаскивайте холст, меняйте масштаб. Дважды щёлкните по карточке для редактирования.</p></div><span className="status-pill"><span /> Сохранение в облаке</span></div>
-            <FamilyCanvas persons={persons} relationships={relationships} onEdit={p => setEditing(p)} onConnect={connect} />
+            <FamilyCanvas persons={persons} relationships={relationships} onEdit={p => setEditing(p)} onDelete={deletePerson} onConnect={connect} onUpdateRelationship={updateRelationship} onDeleteRelationship={deleteRelationship} />
           </div>
           <div className="people-section"><div className="section-heading"><div><h2>Люди в древе</h2><p className="muted small">Нажмите на карточку, чтобы открыть её данные.</p></div><span className="count-pill">{persons.length}</span></div>
             {persons.length === 0 ? <div className="empty-people"><div className="empty-icon">＋</div><h3>Создайте первую персону</h3><p>Начните с себя, родителей или любого родственника.</p><button className="primary" onClick={() => setEditing(null)}>Добавить персону</button></div> :

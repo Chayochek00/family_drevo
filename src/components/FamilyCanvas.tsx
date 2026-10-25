@@ -21,7 +21,7 @@ function PersonNode({ data }: NodeProps<Node<PersonNodeData>>) {
 }
 const nodeTypes = { person: PersonNode };
 type RelationType = 'parent' | 'sibling' | 'spouse' | 'uncle_aunt' | 'niece_nephew';
-type Props = { persons: Person[]; relationships: Relationship[]; onEdit: (p: Person) => void; onDelete: (p: Person) => void; onConnect: (from: string, to: string, type: RelationType) => void; onUpdateRelationship: (id: string, type: RelationType) => void; onDeleteRelationship: (id: string) => void; readOnly?: boolean };
+type Props = { persons: Person[]; relationships: Relationship[]; onEdit: (p: Person) => void; onDelete: (p: Person) => void; onConnect: (from: string, to: string, type: RelationType, sourceHandle?: string, targetHandle?: string) => void; onUpdateRelationship: (id: string, type: RelationType) => void; onDeleteRelationship: (id: string) => void; readOnly?: boolean };
 
 function layoutNodes(nodes: Node<PersonNodeData>[], edges: Edge[]) {
   const graph = new dagre.graphlib.Graph();
@@ -41,6 +41,9 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onDelete,
   const [source, setSource] = useState('');
   const [target, setTarget] = useState('');
   const [type, setType] = useState<'parent' | 'sibling' | 'spouse' | 'uncle_aunt' | 'niece_nephew'>('parent');
+  const [sourceSide, setSourceSide] = useState<'source-top' | 'source-bottom'>('source-bottom');
+  const [targetSide, setTargetSide] = useState<'target-top' | 'target-bottom'>('target-top');
+  const [fullscreen, setFullscreen] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<PersonNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
@@ -54,7 +57,7 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onDelete,
 
   useEffect(() => {
     const relationshipEdges: Edge[] = relationships.map(r => ({
-      id: r.id, source: r.from_person_id, target: r.to_person_id,
+      id: r.id, source: r.from_person_id, target: r.to_person_id, sourceHandle: r.source_handle ?? 'source-bottom', targetHandle: r.target_handle ?? 'target-top',
       label: r.type === 'parent' ? 'родитель → ребёнок' : r.type === 'spouse' ? 'супруги' : r.type === 'uncle_aunt' ? 'дядя/тётя' : r.type === 'niece_nephew' ? 'племянник/племянница' : 'брат/сестра',
       type: 'smoothstep', animated: false,
       style: { stroke: r.type === 'spouse' ? '#c084fc' : '#93a4bd', strokeWidth: 2 },
@@ -82,10 +85,10 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onDelete,
   const handleConnect = useCallback((connection: Connection) => {
     if (readOnly || !connection.source || !connection.target || connection.source === connection.target) return;
     // A direct drag between node handles uses the currently selected relationship type.
-    onConnect(connection.source, connection.target, type);
+    onConnect(connection.source, connection.target, type, connection.sourceHandle ?? 'source-bottom', connection.targetHandle ?? 'target-top');
   }, [readOnly, onConnect, type]);
 
-  return <div className="canvas-wrap">
+  return <div className={`canvas-wrap${fullscreen ? ' canvas-fullscreen' : ''}`}>
     {!readOnly && <div className="relationship-toolbar">
       <span className="muted small">Связи как в редакторе нодов:</span>
       <select aria-label="Тип связи для перетаскивания" value={type} onChange={e => setType(e.target.value as typeof type)}><option value="parent">Родитель → ребёнок</option><option value="sibling">Брат / сестра</option><option value="spouse">Супруги</option><option value="uncle_aunt">Дядя / тётя → племянник/племянница</option><option value="niece_nephew">Племянник/племянница → дядя/тётя</option></select>
@@ -93,10 +96,10 @@ export default function FamilyCanvas({ persons, relationships, onEdit, onDelete,
       <span className="muted small">Или добавьте связь вручную:</span>
       <select aria-label="Первая персона" value={source} onChange={e => setSource(e.target.value)}><option value="">От кого…</option>{persons.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}</select>
       <select aria-label="Вторая персона" value={target} onChange={e => setTarget(e.target.value)}><option value="">С кем…</option>{persons.filter(p => p.id !== source).map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}</select>
-      <button className="secondary small-button" disabled={!source || !target || source === target} onClick={() => { onConnect(source, target, type); setSource(''); setTarget(''); }}>Связать</button>
+      <label className="side-select">Откуда <select value={sourceSide} onChange={e => setSourceSide(e.target.value as typeof sourceSide)}><option value="source-top">Сверху</option><option value="source-bottom">Снизу</option></select></label><label className="side-select">Куда <select value={targetSide} onChange={e => setTargetSide(e.target.value as typeof targetSide)}><option value="target-top">Сверху</option><option value="target-bottom">Снизу</option></select></label><button className="secondary small-button" disabled={!source || !target || source === target} onClick={() => { onConnect(source, target, type, sourceSide, targetSide); setSource(''); setTarget(''); }}>Связать</button>
       <div className="relationship-list"><strong>Существующие связи</strong>{relationships.length === 0 ? <span className="muted small">Связей пока нет.</span> : relationships.map(r => <div className="relationship-row" key={r.id}><span>{persons.find(p => p.id === r.from_person_id)?.first_name ?? 'Персона'} ↔ {persons.find(p => p.id === r.to_person_id)?.first_name ?? 'Персона'}</span><select aria-label="Изменить тип связи" value={r.type} onChange={e => onUpdateRelationship(r.id, e.target.value as RelationType)}><option value="parent">Родитель → ребёнок</option><option value="sibling">Брат / сестра</option><option value="spouse">Супруги</option><option value="uncle_aunt">Дядя / тётя</option><option value="niece_nephew">Племянник / племянница</option></select><button className="danger-small" onClick={() => onDeleteRelationship(r.id)}>Удалить связь</button></div>)}</div>
     </div>}
-    <div className="canvas">
+    <div className="canvas"><button className="canvas-fullscreen-toggle secondary" onClick={() => setFullscreen(v => !v)}>{fullscreen ? '⤢ Выйти из полного экрана' : '⛶ На весь экран'}</button>
       {persons.length === 0 ? <div className="empty-canvas"><div className="empty-icon">✳</div><h3>Здесь начнётся ваша история</h3><p>Добавьте первую персону, затем соедините родственников.</p></div> :
         <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={handleConnect} nodeTypes={nodeTypes} fitView minZoom={0.15} maxZoom={2.2} nodesDraggable={!readOnly} nodesConnectable={!readOnly} edgesReconnectable={!readOnly} deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']} connectionLineStyle={{ stroke: '#7c8cff', strokeWidth: 2 }} proOptions={{ hideAttribution: true }}>
           <Background color="var(--grid)" gap={22} /><Controls /><MiniMap pannable zoomable nodeColor="var(--accent)" />
